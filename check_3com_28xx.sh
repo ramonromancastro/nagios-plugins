@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# check_3com_28xx.sh is a bash function to check 3Com Baseline Switch 28xx-SFP Plus Plugin status 
+# check_3com_28xx.sh is a bash function to check 3Com Baseline Switch 28xx-SFP Plus 
 # Copyright (C) 2017 Ramon Roman Castro <ramonromancastro@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -14,19 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see http://www.gnu.org/licenses/.
-# 3Com Baseline Switch 28xx-SFP Plus Plugin
 #
 # @package    nagios-plugins
 # @author     Ramon Roman Castro <info@rrc2software.com>
 # @link       http://www.rrc2software.com
 # @link       https://github.com/ramonromancastro/nagios-plugins
 
-# Syntax
-# ./check_3com_28xx.sh -H <hostname> -T <test> -w <warn> -c <crit> [-h] [-V] [-v]
-#
-# Return
-# TEST [OK|WARNING|CRITICAL]: MESSAGE | 'TEST'=VALUE;WARNING;CRITICAL;MIN;MAX ...
-#
 # Changes
 # 0.1	First version
 # 0.2	Minor changes
