@@ -16,7 +16,7 @@
 # this program. If not, see http://www.gnu.org/licenses/.
 #
 # @package    nagios-plugins
-# @author     Ramon Roman Castro <info@rrc2software.com>
+# @author     Ramon Roman Castro <ramonromancastro@gmail.com>
 # @link       http://www.rrc2software.com
 # @link       https://github.com/ramonromancastro/nagios-plugins
 
