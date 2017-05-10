@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# check_3com_28xx.sh is a bash function to check 3Com Baseline Switch 29xx-SFP Plus 
+# check_3com_29xx.sh is a bash function to check 3Com Baseline Switch 29xx-SFP Plus 
 # Copyright (C) 2017 Ramon Roman Castro <ramonromancastro@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify it
