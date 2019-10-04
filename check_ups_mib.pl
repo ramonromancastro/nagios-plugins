@@ -34,6 +34,7 @@
 # 0.9	Now return OK when upsInputLineBads > 0 (this is a counter, not a flag)
 # 0.10	Fix set_exit_val()
 # 0.11	Change battery check states. Now, test returns WARNING when upsSecondsOnBattery > 0.
+# 0.11	Add TEST test.
 
 use strict;
 use Net::SNMP;
@@ -46,7 +47,7 @@ use Switch;
 
 # Plugin internal
 
-my $VERSION="0.11";
+my $VERSION="0.12";
 my $SCRIPTNAME="check_ups_mib.pl";
 
 # Nagios specific
@@ -69,6 +70,8 @@ my %mib_upsBatteryStatus_CODE=(1=>'WARNING',2=>'OK',3=>'WARNING',4=>'CRITICAL');
 my @mib_upsWellKnownAlarms_DESC=("upsAlarmBatteryBad","upsAlarmOnBattery","upsAlarmLowBattery","upsAlarmDepletedBattery","upsAlarmTempBad","upsAlarmInputBad","upsAlarmOutputBad","upsAlarmOutputOverload","upsAlarmOnBypass","upsAlarmBypassBad","upsAlarmOutputOffAsRequested","upsAlarmUpsOffAsRequested","upsAlarmChargerFailed","upsAlarmUpsOutputOff","upsAlarmUpsSystemOff","upsAlarmFanFailure","upsAlarmFuseFailure","upsAlarmGeneralFault","upsAlarmDiagnosticTestFailed","upsAlarmCommunicationsLost","upsAlarmAwaitingPower","upsAlarmShutdownPending","upsAlarmShutdownImminent","upsAlarmTestInProgress");
 my @mib_upsWellKnownAlarms_OID=("1.3.6.1.2.1.33.1.6.3.1","1.3.6.1.2.1.33.1.6.3.2","1.3.6.1.2.1.33.1.6.3.3","1.3.6.1.2.1.33.1.6.3.4","1.3.6.1.2.1.33.1.6.3.5","1.3.6.1.2.1.33.1.6.3.6","1.3.6.1.2.1.33.1.6.3.7","1.3.6.1.2.1.33.1.6.3.8","1.3.6.1.2.1.33.1.6.3.9","1.3.6.1.2.1.33.1.6.3.10","1.3.6.1.2.1.33.1.6.3.11","1.3.6.1.2.1.33.1.6.3.12","1.3.6.1.2.1.33.1.6.3.13","1.3.6.1.2.1.33.1.6.3.14","1.3.6.1.2.1.33.1.6.3.15","1.3.6.1.2.1.33.1.6.3.16","1.3.6.1.2.1.33.1.6.3.17","1.3.6.1.2.1.33.1.6.3.18","1.3.6.1.2.1.33.1.6.3.19","1.3.6.1.2.1.33.1.6.3.20","1.3.6.1.2.1.33.1.6.3.21","1.3.6.1.2.1.33.1.6.3.22","1.3.6.1.2.1.33.1.6.3.23","1.3.6.1.2.1.33.1.6.3.24","1.3.6.1.2.1.33.1.6.3.1","1.3.6.1.2.1.33.1.6.3.2","1.3.6.1.2.1.33.1.6.3.3","1.3.6.1.2.1.33.1.6.3.4","1.3.6.1.2.1.33.1.6.3.5","1.3.6.1.2.1.33.1.6.3.6","1.3.6.1.2.1.33.1.6.3.7","1.3.6.1.2.1.33.1.6.3.8","1.3.6.1.2.1.33.1.6.3.9","1.3.6.1.2.1.33.1.6.3.10","1.3.6.1.2.1.33.1.6.3.11","1.3.6.1.2.1.33.1.6.3.12","1.3.6.1.2.1.33.1.6.3.13","1.3.6.1.2.1.33.1.6.3.14","1.3.6.1.2.1.33.1.6.3.15","1.3.6.1.2.1.33.1.6.3.16","1.3.6.1.2.1.33.1.6.3.17","1.3.6.1.2.1.33.1.6.3.18","1.3.6.1.2.1.33.1.6.3.19","1.3.6.1.2.1.33.1.6.3.20","1.3.6.1.2.1.33.1.6.3.21","1.3.6.1.2.1.33.1.6.3.22","1.3.6.1.2.1.33.1.6.3.23","1.3.6.1.2.1.33.1.6.3.24");
 my @mib_upsWellKnownAlarms_CODE=("CRITICAL","WARNING","WARNING","CRITICAL","CRITICAL","CRITICAL","CRITICAL","CRITICAL","CRITICAL","CRITICAL","OK","OK","CRITICAL","CRITICAL","CRITICAL","CRITICAL","CRITICAL","CRITICAL","WARNING","WARNING","WARNING","WARNING","CRITICAL","OK");
+my %mib_upsTestResultsSummary_DESC=(-1=>'unknown',1=>'donePass(1)',2=>'doneWarning(2)',3=>'doneError(3)',4=>'aborted(4)',5=>'inProgress(5)',6=>'noTestsInitiated(6)');
+my %mib_upsTestResultsSummary_CODE=(-1=>'UNKNOWN',1=>'OK',2=>'WARNING',3=>'CRITICAL',4=>'WARNING',5=>'OK',6=>'OK');
 
 
 # SNMP Datas
@@ -122,6 +125,10 @@ my $mib_upsAlarmEntry    = $mib_upsAlarmTable.".1";
 my $mib_upsAlarmId       = $mib_upsAlarmEntry.".1";
 my $mib_upsAlarmDescr    = $mib_upsAlarmEntry.".2";
 my $mib_upsAlarmTime     = $mib_upsAlarmEntry.".3";
+
+my $mib_upsTest               = "1.3.6.1.2.1.33.1.7";
+my $mib_upsTestResultsSummary = $mib_upsTest.".3.0";
+my $mib_upsTestResultsDetail  = $mib_upsTest.".4.0";
 
 # Globals
 
@@ -217,7 +224,7 @@ sub help {
    name or IP address of host to check
 -C, --community=COMMUNITY NAME
    community name for the host's SNMP agent (implies v1 protocol)
--T, --test=(ALARM|BATTERY|BYPASS|INPUT|OUTPUT)
+-T, --test=(ALARM|BATTERY|BYPASS|INPUT|OUTPUT|TEST)
    test to probe on device
 -2, --v2c
    Use snmp v2c
@@ -584,8 +591,33 @@ sub check_input(){
 			$perfomance.=sprintf("'upsInputLineIndex%d_TruePower'=%d;;;; ", $i,$upsInputTruePower);
 		}
 	}
-	
+}
 
+sub check_test(){
+	my @oidlist = ();
+	my $oidtable = undef;
+	my $i = undef;
+	my $snmpkey = undef;
+	my $upsTestResultsSummary = undef;
+	my $upsTestResultsDetail  = undef;
+	
+	@oidlist = ($mib_upsTestResultsSummary,$mib_upsTestResultsDetail);
+	verbose("Checking OID : @oidlist");
+	my $resultat = (version->parse(Net::SNMP->VERSION) < 4) ? $session->get_request(@oidlist) : $session->get_request(-varbindlist => \@oidlist);
+	if (!defined($resultat)) {
+		printf("ERROR: Description table : %s.\n", $session->error);
+		$session->close;
+		exit $ERRORS{"UNKNOWN"};
+	}
+	foreach $snmpkey ( keys %{$resultat} ) { verbose("$snmpkey => $$resultat{$snmpkey}"); }
+	
+	$exit_val=$ERRORS{$mib_upsTestResultsSummary_CODE{$$resultat{$mib_upsTestResultsSummary}}};
+	$upsTestResultsSummary = (defined $$resultat{$mib_upsTestResultsSummary})?$$resultat{$mib_upsTestResultsSummary}:-1;
+	$upsTestResultsDetail = (defined $$resultat{$mib_upsTestResultsDetail})?$$resultat{$mib_upsTestResultsDetail}:"Unknown";
+	
+	$messages.=sprintf("TEST STATUS: %s\n", $ERRORS_TEXT{$exit_val});
+	$messages.=sprintf("upsTestResultsSummary: %s\n", $mib_upsTestResultsSummary_DESC{$$resultat{$mib_upsTestResultsSummary}});
+	$messages.=sprintf("upsTestResultsDetail: %s\n", $$resultat{$mib_upsTestResultsDetail});
 }
 
 switch($o_test){
@@ -603,6 +635,9 @@ switch($o_test){
 	}
 	case "OUTPUT"{
 		check_output();
+	}
+	case "TEST"{
+		check_test();
 	}
 	else{
 		help();
