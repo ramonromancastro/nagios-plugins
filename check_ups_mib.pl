@@ -35,6 +35,7 @@
 # 0.10	Fix set_exit_val()
 # 0.11	Change battery check states. Now, test returns WARNING when upsSecondsOnBattery > 0.
 # 0.11	Add TEST test.
+# 0.12	Fixed INPUT test.
 
 use strict;
 use Net::SNMP;
@@ -525,21 +526,29 @@ sub check_input(){
 	my $oidtable = undef;
 	my $i = undef;
 	my $snmpkey = undef;
+	my $upsInputLineBads = 0;
+	my $upsInputNumLines = 0;
 	my $upsInputFrequency = 0;
 	my $upsInputVoltage = 0;
 	my $upsInputCurrent = 0;
 	my $upsInputTruePower = 0;
 	
-	@oidlist = ($mib_upsInputLineBads,$mib_upsInputNumLines);
+	@oidlist = ($mib_upsInputLineBads);
 	verbose("Checking OID : @oidlist");
 	my $resultatInput = (version->parse(Net::SNMP->VERSION) < 4) ? $session->get_request(@oidlist) : $session->get_request(-varbindlist => \@oidlist);
-	if (!defined($resultatInput)) {
-		printf("ERROR: Description table : %s.\n", $session->error);
-		$session->close;
-		exit $ERRORS{"UNKNOWN"};
+	if (defined($resultatInput)) {
+		$upsInputLineBads = $$resultatInput{$mib_upsInputLineBads};
 	}
 	foreach $snmpkey ( keys %{$resultatInput} ) { verbose("$snmpkey => $$resultatInput{$snmpkey}"); }
 	
+	@oidlist = ($mib_upsInputNumLines);
+	verbose("Checking OID : @oidlist");
+	my $resultatInput = (version->parse(Net::SNMP->VERSION) < 4) ? $session->get_request(@oidlist) : $session->get_request(-varbindlist => \@oidlist);
+	if (defined($resultatInput)) {
+		$upsInputNumLines = $$resultatInput{$mib_upsInputNumLines};
+	}
+	foreach $snmpkey ( keys %{$resultatInput} ) { verbose("$snmpkey => $$resultatInput{$snmpkey}"); }
+
 	# 0.9
 	# if ($$resultatInput{$mib_upsInputLineBads} >= $$resultatInput{$mib_upsInputNumLines}){ $exit_val = $NAGIOS_CRITICAL }
 	# elsif ($$resultatInput{$mib_upsInputLineBads} > 0){ $exit_val = $NAGIOS_WARNING; }
@@ -549,8 +558,8 @@ sub check_input(){
 	#
 	
 	$messages.=sprintf("INPUT STATUS: %s\n", $ERRORS_TEXT{$exit_val});
-	$messages.=sprintf("upsInputLineBads: %d\n", $$resultatInput{$mib_upsInputLineBads});
-	$messages.=sprintf("upsInputNumLines: %d\n", $$resultatInput{$mib_upsInputNumLines});
+	$messages.=sprintf("upsInputLineBads: %d\n", $upsInputLineBads);
+	$messages.=sprintf("upsInputNumLines: %d\n", $upsInputNumLines);
 
 	$oidtable = $mib_upsInputTable;
 	verbose("Checking OID : $oidtable");
