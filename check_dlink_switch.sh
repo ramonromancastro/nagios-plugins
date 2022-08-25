@@ -1,35 +1,27 @@
 #!/bin/bash
 #
-# check_dlink_switch.sh is a bash function to check DLink switches 
-# Copyright (C) 2017 Ramon Roman Castro <ramonromancastro@gmail.com>
+# D-Link Switch Plugin
 #
-# This program is free software: you can redistribute it and/or modify it
-# under the terms of the GNU General Public License as published by the Free
-# Software Foundation, either version 3 of the License, or (at your option)
-# any later version.
+# Description     : Check D-Link switch status
+# Original author : Ramon Roman Castro <info@rrc2software.com>
 #
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# Syntax
+# ./check_dlink_switch -H <hostname> -C <community> -T <test> -w <warn> -c <crit> [-h] [-V] [-v]
 #
-# You should have received a copy of the GNU General Public License along with
-# this program. If not, see http://www.gnu.org/licenses/.
+# Return
+# TEST [OK|WARNING|CRITICAL]: MESSAGE | 'TEST'=VALUE;WARNING;CRITICAL;MIN;MAX ...
 #
-# @package    nagios-plugins
-# @author     Ramon Roman Castro <ramonromancastro@gmail.com>
-# @link       http://www.rrc2software.com
-# @link       https://github.com/ramonromancastro/nagios-plugins
-
 # Changes
 # 0.1	First version
 # 0.2	Add PORT usage test
 # 0.2.1	Fix minor perf errors
 # 0.3	Ignore internal temperature threshold
+# 0.4	Check SNMP connectivity before test
 
 # ----------------------------------
 # VARIABLES
 # ----------------------------------
-VERSION="0.3"
+VERSION="0.4"
 PROGPATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
 
 DEPENDENCIES=("snmpwalk" "snmpget")
@@ -44,6 +36,8 @@ STATE_DESCRIPTION=( "OK" "WARNING" "CRITICAL" "UNKNOWN" "DEPENDENT" )
 
 
 # OID VALUES
+oid_sysObjectID=.1.3.6.1.2.1.1.2.0
+
 oid_agentCPUutilizationIn1min=.1.3.6.1.4.1.171.12.1.1.6.2.0
 oid_swDevInfoNumOfPortInUse=.1.3.6.1.4.1.171.11.117.1.3.2.1.1.2.0
 oid_swDevInfoTotalNumOfPort=.1.3.6.1.4.1.171.11.117.1.3.2.1.1.1.0
@@ -117,7 +111,7 @@ function print_version(){
 function print_help(){
 	echo "D-Link Switch Plugin"
 	echo ""
-	echo "This plugin is not developed by the Nagios Plugin group."
+	echo "This plugin is not developped by the Nagios Plugin group."
 	echo "Please do not e-mail them for support on this plugin."
 	echo ""
 	echo "For contact info, please read the plugin script file."
@@ -569,6 +563,14 @@ do
 		;;
 	esac
 done
+
+# Check connectivity
+if [ -n "$VERBOSE" ]; then echo "[ ] Checking SNMP connectivity"; fi
+TEST_RESULT=`snmpget -v 2c -c $COMMUNITY $HOSTNAME $oid_sysObjectID 2> /dev/null`
+if [ "$?" != "0" ] ; then
+	echo "CRITICAL - Problem with SNMP request, check user/password/host"
+	exit $STATE_CRITICAL
+fi
 
 # Do test
 case "$TEST" in
