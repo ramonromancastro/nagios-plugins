@@ -27,11 +27,12 @@
 # 0.4	Add FIRMWARE and LOAD test
 # 0.5	Add HEALTH test
 # 0.6	Add license
+# 0.7	Add FA, POWER, TEMP test. Remove HEALTH test. Check SNMP result.
 
 # ----------------------------------
 # VARIABLES
 # ----------------------------------
-VERSION="0.6"
+VERSION="0.7"
 PROGPATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
 
 DEPENDENCIES=("snmpwalk" "snmpget")
@@ -132,13 +133,15 @@ function check_threshold(){
 	fi
 }
 
-function snmp_number(){
-	SNMP_VALUE=`snmpget -v 2c -Oe -c $COMMUNITY $HOSTNAME $1 | cut -d " " -f4`
-	echo $SNMP_VALUE
+function check_snmp_result(){
+	if [ -z $1 ]; then
+		echo "ERROR: SNMP timeout/error"
+		exit $STATE_UNKNOWN
+	fi
 }
 
-function snmp_string(){
-	SNMP_VALUE=`snmpget -v 2c -Oe -c $COMMUNITY $HOSTNAME $1 | cut -d " " -f4 | cut -d "\"" -f2`
+function snmp_number(){
+	SNMP_VALUE=`snmpget -v 2c -Oqnv -c $COMMUNITY $HOSTNAME $1 2>/dev/null`
 	echo $SNMP_VALUE
 }
 
@@ -195,7 +198,9 @@ function print_help(){
 	echo "   -T <test>       ... test to probe on device"
 	echo "      FIRMWARE     ... firmware version"
 	echo "      LOAD         ... Load% utilization"
-	echo "      HEALTH       ... Health test (FA, PS, Temp)"
+	echo "      POWER        ... Power supply test"
+	echo "      FAN          ... Fan test"
+	echo "      TEMP         ... Temperatute test"
 	echo "   -w <warn>       ... warning threshold"
 	echo "   -c <crit>       ... critical threshold"
 	echo "   -x <arg>        ... extra arguments"
@@ -217,24 +222,43 @@ function health_test(){
 	NUNKN=0
 	verb "Reading rlPhdUnitEnvParamStackUnit"
 	UNIT_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamStackUnit | cut -d " " -f4 ))
+	check_snmp_result "$UNIT_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamMainPSStatus"
 	MAINPS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamMainPSStatus | cut -d " " -f4 ))
+	check_snmp_result "$MAINPS_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamRedundantPSStatus"
 	REDUNDANTPS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamRedundantPSStatus | cut -d " " -f4 ))
+	check_snmp_result "$REDUNDANTPS_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamFan1Status"
 	FAN1_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan1Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN1_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamFan2Status"
 	FAN2_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan2Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN2_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamFan3Status"
 	FAN3_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan3Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN3_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamFan4Status"
 	FAN4_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan4Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN4_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamFan5Status"
 	FAN5_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan5Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN5_TABLE"
+	
 	verb "Reading rlPhdUnitEnvParamTempSensorValue"
 	TEMPVALUE_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamTempSensorValue | cut -d " " -f4 ))
+	check_snmp_result "$TEMPVALUE_TABLE"
+
 	verb "Reading rlPhdUnitEnvParamTempSensorStatus"
 	TEMPSTATUS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamTempSensorStatus | cut -d " " -f4 ))
+	check_snmp_result "$TEMPSTATUS_TABLE"
 	
 	for i in ${!UNIT_TABLE[*]}; do
 		check_RlEnvMonState "${MAINPS_TABLE[$i]}"
@@ -275,15 +299,238 @@ function health_test(){
 	fi
 }
 
+function power_test(){
+	NWARN=0
+	NCRIT=0
+	NUNKN=0
+	verb "Reading rlPhdUnitEnvParamStackUnit"
+	UNIT_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamStackUnit | cut -d " " -f4 ))
+	check_snmp_result "$UNIT_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamMainPSStatus"
+	MAINPS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamMainPSStatus | cut -d " " -f4 ))
+	check_snmp_result "$MAINPS_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamRedundantPSStatus"
+	REDUNDANTPS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamRedundantPSStatus | cut -d " " -f4 ))
+	check_snmp_result "$REDUNDANTPS_TABLE"
+	
+	for i in ${!UNIT_TABLE[*]}; do
+		check_RlEnvMonState "${MAINPS_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.MainPS: ${RlEnvMonState_Description[$[${MAINPS_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${REDUNDANTPS_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.RedundantPS: ${RlEnvMonState_Description[$[${REDUNDANTPS_TABLE[$i]}-1]]}" )
+	done
+	
+	if [ "$NCRIT" -gt 0 ]; then
+		MESSAGE=( "CRITICAL: $NCRIT sensors are in critical state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_CRITICAL
+	elif [ "$NWARN" -gt 0 ]; then
+		MESSAGE=( "WARNING: $NWARN sensors are in warning state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_WARNING
+	elif [ "$NUNKN" -gt 0 ]; then
+		MESSAGE=( "UNKNOWN: $NUNKN sensors are in unknown state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_UNKNOWN
+	else
+		MESSAGE=( "OK: All sensors are ok" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_OK
+	fi
+}
+
+function fan_test(){
+	NWARN=0
+	NCRIT=0
+	NUNKN=0
+	verb "Reading rlPhdUnitEnvParamStackUnit"
+	UNIT_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamStackUnit | cut -d " " -f4 ))
+	check_snmp_result "$UNIT_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamMainPSStatus"
+	MAINPS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamMainPSStatus | cut -d " " -f4 ))
+	check_snmp_result "$MAINPS_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamRedundantPSStatus"
+	REDUNDANTPS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamRedundantPSStatus | cut -d " " -f4 ))
+	check_snmp_result "$REDUNDANTPS_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan1Status"
+	FAN1_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan1Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN1_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan2Status"
+	FAN2_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan2Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN2_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan3Status"
+	FAN3_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan3Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN3_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan4Status"
+	FAN4_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan4Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN4_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan5Status"
+	FAN5_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan5Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN5_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamTempSensorValue"
+	TEMPVALUE_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamTempSensorValue | cut -d " " -f4 ))
+	check_snmp_result "$TEMPVALUE_TABLE"
+
+	verb "Reading rlPhdUnitEnvParamTempSensorStatus"
+	TEMPSTATUS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamTempSensorStatus | cut -d " " -f4 ))
+	check_snmp_result "$TEMPSTATUS_TABLE"
+	
+	for i in ${!UNIT_TABLE[*]}; do
+		check_RlEnvMonState "${MAINPS_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.MainPS: ${RlEnvMonState_Description[$[${MAINPS_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${REDUNDANTPS_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.RedundantPS: ${RlEnvMonState_Description[$[${REDUNDANTPS_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN1_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan1: ${RlEnvMonState_Description[$[${FAN1_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN2_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan2: ${RlEnvMonState_Description[$[${FAN2_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN3_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan3: ${RlEnvMonState_Description[$[${FAN3_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN4_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan4: ${RlEnvMonState_Description[$[${FAN4_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN5_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan5: ${RlEnvMonState_Description[$[${FAN5_TABLE[$i]}-1]]}" )
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Temp: ${EntitySensorStatus_Description[$[${TEMPSTATUS_TABLE[$i]}-1]]}" )
+		if [ "${TEMPVALUE_TABLE[$i]}" -ne 0 ]; then
+			check_EntitySensorStatus "${TEMPSTATUS_TABLE[$i]}"
+			MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Temp.Celsius ${TEMPVALUE_TABLE[$i]}" )
+		fi
+		#TEMPVALUE_TABLE
+		#TEMPSTATUS_TABLE
+	done
+	
+	if [ "$NCRIT" -gt 0 ]; then
+		MESSAGE=( "CRITICAL: $NCRIT sensors are in critical state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_CRITICAL
+	elif [ "$NWARN" -gt 0 ]; then
+		MESSAGE=( "WARNING: $NWARN sensors are in warning state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_WARNING
+	elif [ "$NUNKN" -gt 0 ]; then
+		MESSAGE=( "UNKNOWN: $NUNKN sensors are in unknown state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_UNKNOWN
+	else
+		MESSAGE=( "OK: All sensors are ok" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_OK
+	fi
+}
+
+function fan_test(){
+	NWARN=0
+	NCRIT=0
+	NUNKN=0
+	verb "Reading rlPhdUnitEnvParamStackUnit"
+	UNIT_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamStackUnit | cut -d " " -f4 ))
+	check_snmp_result "$UNIT_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan1Status"
+	FAN1_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan1Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN1_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan2Status"
+	FAN2_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan2Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN2_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan3Status"
+	FAN3_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan3Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN3_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan4Status"
+	FAN4_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan4Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN4_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamFan5Status"
+	FAN5_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamFan5Status | cut -d " " -f4 ))
+	check_snmp_result "$FAN5_TABLE"
+
+	for i in ${!UNIT_TABLE[*]}; do
+		check_RlEnvMonState "${FAN1_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan1: ${RlEnvMonState_Description[$[${FAN1_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN2_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan2: ${RlEnvMonState_Description[$[${FAN2_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN3_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan3: ${RlEnvMonState_Description[$[${FAN3_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN4_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan4: ${RlEnvMonState_Description[$[${FAN4_TABLE[$i]}-1]]}" )
+		check_RlEnvMonState "${FAN5_TABLE[$i]}"
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Fan5: ${RlEnvMonState_Description[$[${FAN5_TABLE[$i]}-1]]}" )
+	done
+	
+	if [ "$NCRIT" -gt 0 ]; then
+		MESSAGE=( "CRITICAL: $NCRIT sensors are in critical state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_CRITICAL
+	elif [ "$NWARN" -gt 0 ]; then
+		MESSAGE=( "WARNING: $NWARN sensors are in warning state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_WARNING
+	elif [ "$NUNKN" -gt 0 ]; then
+		MESSAGE=( "UNKNOWN: $NUNKN sensors are in unknown state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_UNKNOWN
+	else
+		MESSAGE=( "OK: All sensors are ok" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_OK
+	fi
+}
+
+function temp_test(){
+	NWARN=0
+	NCRIT=0
+	NUNKN=0
+	verb "Reading rlPhdUnitEnvParamStackUnit"
+	UNIT_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamStackUnit | cut -d " " -f4 ))
+	check_snmp_result "$UNIT_TABLE"
+	
+	verb "Reading rlPhdUnitEnvParamTempSensorValue"
+	TEMPVALUE_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamTempSensorValue | cut -d " " -f4 ))
+	check_snmp_result "$TEMPVALUE_TABLE"
+
+	verb "Reading rlPhdUnitEnvParamTempSensorStatus"
+	TEMPSTATUS_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitEnvParamTempSensorStatus | cut -d " " -f4 ))
+	check_snmp_result "$TEMPSTATUS_TABLE"
+	
+	for i in ${!UNIT_TABLE[*]}; do
+		MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Temp: ${EntitySensorStatus_Description[$[${TEMPSTATUS_TABLE[$i]}-1]]}" )
+		if [ "${TEMPVALUE_TABLE[$i]}" -ne 0 ]; then
+			check_EntitySensorStatus "${TEMPSTATUS_TABLE[$i]}"
+			MESSAGE=( "${MESSAGE[@]}" "Unit${UNIT_TABLE[$i]}.Temp.Celsius ${TEMPVALUE_TABLE[$i]}" )
+		fi
+		#TEMPVALUE_TABLE
+		#TEMPSTATUS_TABLE
+	done
+	
+	if [ "$NCRIT" -gt 0 ]; then
+		MESSAGE=( "CRITICAL: $NCRIT sensors are in critical state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_CRITICAL
+	elif [ "$NWARN" -gt 0 ]; then
+		MESSAGE=( "WARNING: $NWARN sensors are in warning state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_WARNING
+	elif [ "$NUNKN" -gt 0 ]; then
+		MESSAGE=( "UNKNOWN: $NUNKN sensors are in unknown state" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_UNKNOWN
+	else
+		MESSAGE=( "OK: All sensors are ok" "${MESSAGE[@]}")
+		EXIT_VAL=$STATE_OK
+	fi
+}
+
 function firmware_test(){
 	NUNITS=0
 	NWARN=0
 	if [ -n "$VERBOSE" ]; then echo "[ ] Reading rlPhdUnitGenParamStackUnit"; fi
 	NAME_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitGenParamStackUnit | cut -d " " -f4 ))
+	check_snmp_result "$NAME_TABLE"
+	
 	if [ -n "$VERBOSE" ]; then echo "[ ] Reading rlPhdUnitGenParamFirmwareVersion"; fi
 	FIRMWARE_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitGenParamFirmwareVersion | cut -d "\"" -f2 ))
+	check_snmp_result "$FIRMWARE_TABLE"
+
 	if [ -n "$VERBOSE" ]; then echo "[ ] Reading rlPhdUnitGenParamSerialNum"; fi
 	SERIAL_TABLE=($( snmpwalk -v 2c -c $COMMUNITY $HOSTNAME $oid_rlPhdUnitGenParamSerialNum | cut -d "\"" -f2 ))
+	check_snmp_result "$SERIAL_TABLE"
 	
 	for i in ${!NAME_TABLE[*]}; do
 		if [ -n "$VERBOSE" ]; then
@@ -313,15 +560,19 @@ function firmware_test(){
 function load_usage(){
 	verb "Read rlCpuUtilEnable"
 	rlCpuUtilEnable=$(snmp_number $oid_rlCpuUtilEnable)
+	check_snmp_result $rlCpuUtilEnable
 	
 	verb "Read rlCpuUtilDuringLastSecond"
 	rlCpuUtilDuringLastSecond=$(snmp_number $oid_rlCpuUtilDuringLastSecond)
+	check_snmp_result $oid_rlCpuUtilDuringLastSecond
 	
 	verb "Read rlCpuUtilDuringLastMinute"
 	rlCpuUtilDuringLastMinute=$(snmp_number $oid_rlCpuUtilDuringLastMinute)
+	check_snmp_result $oid_rlCpuUtilDuringLastMinute
 	
 	verb "Read rlCpuUtilDuringLast5Minutes"
 	rlCpuUtilDuringLast5Minutes=$(snmp_number $oid_rlCpuUtilDuringLast5Minutes)
+	check_snmp_result $oid_rlCpuUtilDuringLast5Minutes
 
 	if [ $rlCpuUtilEnable -eq 1 ]; then
 		check_range $rlCpuUtilDuringLast5Minutes $CRITICAL
@@ -413,8 +664,14 @@ case "$TEST" in
 		check_threshold
 		load_usage
 		;;
-	"HEALTH")
-		health_test
+	"FAN")
+		fan_test
+		;;
+	"POWER")
+		power_test
+		;;
+	"TEMP")
+		temp_test
 		;;
 	*)
 		print_help
