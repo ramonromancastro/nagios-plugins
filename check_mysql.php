@@ -30,7 +30,7 @@ define("TEST_PERF",3);
 define("TEST_VALUE",4);
 
 define("PROGNAME","check_mysql.php");
-define("VERSION","0.5");
+define("VERSION","0.6");
 
 $mysql_checks = array(
 	"pct_slow_queries"          	=> array("%", ">",  5, "5",   'round(100*$mystat{"Slow_queries"} / $mystat{"Questions"},2)'),
